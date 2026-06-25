@@ -32,6 +32,3 @@ async def root():
         "message": "GhostLine backend running"
     }
 
-@app.post("/analyze")
-def analyze(data: dict):
-    return {"message": "working"}    
