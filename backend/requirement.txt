@@ -1,24 +1,17 @@
 fastapi
-uvicorn[standard]
-
+uvicorn
 pydantic
 python-dotenv
 python-multipart
 
-sentence-transformers
+# AI & Data Core
 scikit-learn
 numpy
 pandas
-
 faiss-cpu
-
 openai
-
 networkx
-
 websockets
 
-pytest
-httpx
-
-openai>=1.0.0
+# Optional Local Transformer (Remove if you switch to OpenAI/Groq Embeddings API)
+sentence-transformers

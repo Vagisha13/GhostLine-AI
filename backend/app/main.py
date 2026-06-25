@@ -10,7 +10,7 @@ app = FastAPI(title="GhostLine Backend")
 
 origins = [
     "http://localhost:3000",
-    "http://localhost:3001",
+    "https://ghostline-ai.vercel.app",
 ]
 
 app.add_middleware(
