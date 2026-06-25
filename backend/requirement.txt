@@ -12,6 +12,3 @@ faiss-cpu
 openai
 networkx
 websockets
-
-# Optional Local Transformer (Remove if you switch to OpenAI/Groq Embeddings API)
-sentence-transformers
