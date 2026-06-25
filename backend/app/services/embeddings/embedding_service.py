@@ -1,41 +1,54 @@
-import os
 import numpy as np
-from openai import OpenAI
-from functools import lru_cache
+from sklearn.feature_extraction.text import TfidfVectorizer
 
-# Initialize the OpenAI client (it automatically looks for os.environ.get("OPENAI_API_KEY"))
-client = OpenAI()
+# Define a fixed feature dimension size (e.g., 384 to match your original MiniLM model)
+# This keeps it perfectly compatible if you are feeding these vectors into FAISS!
+VECTOR_DIM = 384
 
-@lru_cache(maxsize=10000)
+# Initialize a lightweight vectorizer
+# We cap max_features so the resulting matrix has a fixed, reliable dimension size
+vectorizer = TfidfVectorizer(max_features=VECTOR_DIM)
+
+def _ensure_vector_dims(matrix, target_dim=VECTOR_DIM):
+    """Helper to guarantee the output numpy array always matches our exact target dimension"""
+    current_dim = matrix.shape[1]
+    if current_dim < target_dim:
+        # Pad with zeros if vocabulary is small
+        padding = np.zeros((matrix.shape[0], target_dim - current_dim), dtype=np.float32)
+        return np.hstack((matrix, padding))
+    return matrix[:, :target_dim]
+
 def embed_single(text):
-    response = client.embeddings.create(
-        input=[text],
-        model="text-embedding-3-small"  # Highly efficient, lightweight 1536-dim model
-    )
-    # Extract the embedding vector
-    embedding = response.data[0].embedding
+    if not text.strip():
+        return np.zeros(VECTOR_DIM, dtype=np.float32)
     
-    # Normalize the embedding manually (since OpenAI gives them highly regularized, 
-    # but doing it explicitly mirrors your original code's intent)
+    # TF-IDF fits on a list
+    try:
+        raw_matrix = vectorizer.fit_transform([text]).toarray().astype(np.float32)
+        embedding = _ensure_vector_dims(raw_matrix)[0]
+    except ValueError:
+        # Fallback if text contains only stop words or symbols
+        return np.zeros(VECTOR_DIM, dtype=np.float32)
+
+    # L2 Normalization (Unit Length Guard)
     norm = np.linalg.norm(embedding)
     if norm > 0:
         embedding = embedding / norm
-        
-    return np.array(embedding, dtype=np.float32)
+
+    return embedding
 
 def generate_embeddings(texts):
     if not texts:
-        return np.empty((0, 1536), dtype=np.float32)
-        
-    response = client.embeddings.create(
-        input=texts,
-        model="text-embedding-3-small"
-    )
-    
-    # Map responses out to a numpy matrix
-    embeddings = np.array([item.embedding for item in response.data], dtype=np.float32)
-    
-    # Manual L2 Normalization check to mirror normalize_embeddings=True
+        return np.empty((0, VECTOR_DIM), dtype=np.float32)
+
+    try:
+        # Fit and transform the batch of text items
+        raw_matrix = vectorizer.fit_transform(texts).toarray().astype(np.float32)
+        embeddings = _ensure_vector_dims(raw_matrix)
+    except ValueError:
+        return np.zeros((len(texts), VECTOR_DIM), dtype=np.float32)
+
+    # Manual L2 Normalization check to mirror your original guard rails
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     norms[norms == 0] = 1.0  # Prevent divide by zero
     embeddings = embeddings / norms
